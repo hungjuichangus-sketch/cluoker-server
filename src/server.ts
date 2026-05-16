@@ -5,7 +5,7 @@ import cors from 'cors';
 import type { Card } from './types';
 import type { Room } from './types';
 import { buildPlayerView, processMakeGuess, processPlayClue } from './gameLogic';
-import { buildLobbyView, createRoom, getRoom, joinRoom, leaveRoom, startRoom } from './rooms';
+import { buildLobbyView, createRoom, getRoom, joinRoom, leaveRoom, restartRoom, startRoom } from './rooms';
 
 const app = express();
 app.use(cors());
@@ -60,6 +60,12 @@ io.on('connection', (socket) => {
     const result = processMakeGuess(room, socket.id, card);
     if ('error' in result) { socket.emit('game_error', { message: result.error }); return; }
     broadcastGame(room);
+  });
+
+  socket.on('restart_game', ({ roomCode }: { roomCode: string }) => {
+    const result = restartRoom(socket.id, roomCode);
+    if ('error' in result) { socket.emit('game_error', { message: result.error }); return; }
+    io.to(result.room.code).emit('room_updated', buildLobbyView(result.room));
   });
 
   socket.on('disconnect', () => {

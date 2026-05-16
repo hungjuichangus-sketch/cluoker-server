@@ -111,6 +111,29 @@ export function leaveRoom(socketId: string): Room | null {
   return room;
 }
 
+export function restartRoom(
+  socketId: string,
+  roomCode: string,
+): { room: Room } | { error: string } {
+  const room = rooms.get(roomCode);
+  if (!room) return { error: 'Room not found.' };
+  if (room.hostSocketId !== socketId) return { error: 'Only the host can start a new round.' };
+  if (room.state !== 'finished') return { error: 'Game is not finished yet.' };
+
+  room.state = 'waiting';
+  room.winners = [];
+  room.actionLog = [];
+  room.deck = [];
+  room.activePlayerIndex = 0;
+  room.players = room.players.map((p) => ({
+    ...DUMMY_PLAYER(),
+    socketId: p.socketId,
+    name: p.name,
+  }));
+
+  return { room };
+}
+
 export function getRoom(code: string): Room | undefined {
   return rooms.get(code);
 }
