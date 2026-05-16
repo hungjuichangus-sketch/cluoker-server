@@ -9,7 +9,7 @@ import { buildLobbyView, createRoom, getRoom, joinRoom, leaveRoom, restartRoom, 
 
 const app = express();
 app.use(cors());
-app.get('/health', (_, res) => res.json({ status: 'ok' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '1.2.0' }));
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
