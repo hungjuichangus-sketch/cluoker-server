@@ -42,6 +42,7 @@ export function createRoom(socketId: string, playerName: string): { room: Room }
     deck: [],
     activePlayerIndex: 0,
     winners: [],
+    lastChancePlayers: null,
     actionLog: [],
   };
   rooms.set(code, room);
@@ -83,6 +84,7 @@ export function startRoom(
   room.deck = deck;
   room.state = 'playing';
   room.activePlayerIndex = 0;
+  room.lastChancePlayers = null;
   room.actionLog = [`Game started! ${room.players[0].name}'s turn.`];
 
   return { room };
@@ -122,6 +124,7 @@ export function restartRoom(
 
   room.state = 'waiting';
   room.winners = [];
+  room.lastChancePlayers = null;
   room.actionLog = [];
   room.deck = [];
   room.activePlayerIndex = 0;

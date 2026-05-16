@@ -28,7 +28,8 @@ export interface Room {
   players: ServerPlayer[];
   deck: Card[];
   activePlayerIndex: number;
-  winners: string[];     // socketIds
+  winners: string[];              // socketIds
+  lastChancePlayers: string[] | null; // null = normal play; array = last round (may be empty → finish)
   actionLog: string[];
 }
 

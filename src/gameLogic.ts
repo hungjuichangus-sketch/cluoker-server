@@ -26,12 +26,31 @@ function appendLog(room: Room, entry: string): void {
   if (room.actionLog.length > 20) room.actionLog.shift();
 }
 
+// Returns socketIds of players who still have a turn left this round (index > winnerIdx, not eliminated).
+function getLastChancePlayers(room: Room, winnerIdx: number): string[] {
+  const result: string[] = [];
+  for (let idx = winnerIdx + 1; idx < room.players.length; idx++) {
+    if (!room.players[idx].isEliminated) result.push(room.players[idx].socketId);
+  }
+  return result;
+}
+
+function finishLastRound(room: Room): void {
+  room.state = 'finished';
+  if (room.winners.length > 1) {
+    appendLog(room, `It's a tie! ${room.winners.map((id) => room.players.find((p) => p.socketId === id)?.name ?? '').join(' & ')} all win!`);
+  }
+}
+
 function checkOnlyOneAlive(room: Room): boolean {
   const alive = room.players.filter((p) => !p.isEliminated);
   if (alive.length === 1) {
     room.state = 'finished';
-    room.winners = [alive[0].socketId];
-    appendLog(room, `${alive[0].name} is the last one standing — wins!`);
+    // Preserve existing winners (last-round case); only set if none yet.
+    if (room.winners.length === 0) {
+      room.winners = [alive[0].socketId];
+      appendLog(room, `${alive[0].name} is the last one standing — wins!`);
+    }
     return true;
   }
   return false;
@@ -121,6 +140,10 @@ export function processPlayClue(
   appendLog(room, `${player.name} played ${cardLabel(played)} → ${result === 'yes' ? '✓ Yes' : '✗ No'}`);
 
   if (!checkOnlyOneAlive(room)) {
+    if (room.lastChancePlayers !== null) {
+      room.lastChancePlayers = room.lastChancePlayers.filter((id) => id !== player.socketId);
+      if (room.lastChancePlayers.length === 0) { finishLastRound(room); return { ok: true }; }
+    }
     room.activePlayerIndex = nextNonEliminated(room.players, playerIdx);
   }
 
@@ -144,14 +167,39 @@ export function processMakeGuess(
   const correct = cardsEqual(guess, player.answerCard);
 
   if (correct) {
-    room.state = 'finished';
-    room.winners = [socketId];
-    appendLog(room, `${player.name} guessed ${cardLabel(guess)} → Correct! Wins!`);
+    room.winners.push(socketId);
+    appendLog(room, `${player.name} guessed ${cardLabel(guess)} → Correct!`);
+
+    // First winner: compute who still has a turn left this round.
+    if (room.lastChancePlayers === null) {
+      room.lastChancePlayers = getLastChancePlayers(room, playerIdx);
+      if (room.lastChancePlayers.length > 0) {
+        appendLog(room, `Last round — ${room.lastChancePlayers.length} player(s) still get a chance.`);
+      }
+    } else {
+      // Subsequent winner during last round: remove them from the list.
+      room.lastChancePlayers = room.lastChancePlayers.filter((id) => id !== socketId);
+    }
+
+    if (room.lastChancePlayers.length === 0) {
+      finishLastRound(room);
+    } else {
+      room.activePlayerIndex = nextNonEliminated(room.players, playerIdx);
+    }
   } else {
     player.isEliminated = true;
     appendLog(room, `${player.name} guessed ${cardLabel(guess)} → Wrong! Eliminated.`);
+
+    if (room.lastChancePlayers !== null) {
+      room.lastChancePlayers = room.lastChancePlayers.filter((id) => id !== socketId);
+    }
+
     if (!checkOnlyOneAlive(room)) {
-      room.activePlayerIndex = nextNonEliminated(room.players, playerIdx);
+      if (room.lastChancePlayers !== null && room.lastChancePlayers.length === 0) {
+        finishLastRound(room);
+      } else {
+        room.activePlayerIndex = nextNonEliminated(room.players, playerIdx);
+      }
     }
   }
 
